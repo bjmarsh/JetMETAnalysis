@@ -282,7 +282,7 @@ void L2Creator::loopOverEtaBins() {
                 abscor  =1.0/absrsp;
                 eabscor = abscor*abscor*epeak;
             }
-            if ((abscor>0) && (absrsp>0) && (eabscor>1e-5) && (eabscor/abscor<0.5) && (eabsrsp>1e-4) && (eabsrsp/absrsp<0.5)) {
+            if ((abscor>0) && (absrsp>0) && (eabscor>1e-5) && (eabscor/abscor<0.5) && (eabsrsp>1e-5) && (eabsrsp/absrsp<0.5)) {
                 int n = vabsrsp_eta.back()->GetN();
                 vabsrsp_eta.back()->SetPoint     (n,refpt, absrsp);
                 vabsrsp_eta.back()->SetPointError(n,erefpt,eabsrsp);

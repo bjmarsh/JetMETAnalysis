@@ -100,41 +100,43 @@ int main(int argc,char**argv)
     }
     else cout<<"jecpath set to "<<jecpath<<endl;
   }
-  
-  TChain* ichain = new TChain();
+
   TFile* ifile = nullptr;
+  
+  // TChain* ichain = new TChain();
   if (url_string.empty()) {
-    ichain->Add(input.c_str());
+    // ichain->Add(input.c_str());
     ifile = TFile::Open(input.c_str(),"READ");
     if (!ifile) { cout<<"Can't open file "<<input<<endl; return -2; }
     if (output.empty()) output=input.substr(0,input.find(".root"))+"_jec.root";
   }
-  #if(has_xrdcl)
-    else {
-      int file_count(0);
-      XrdCl::DirectoryList *response;
-      XrdCl::DirListFlags::Flags flags = XrdCl::DirListFlags::None;
-      XrdCl::URL url(url_string);
-      XrdCl::FileSystem fs(url);
-      fs.DirList(input,flags,response);
-      for(auto iresp=response->Begin(); iresp!=response->End(); iresp++) {
-        if((*iresp)->GetName().find(".root")!=std::string::npos) {
-           cout << "\tAdding " << url_string << input << (*iresp)->GetName() << endl;
-           file_count = ichain->Add((url_string+input+(*iresp)->GetName()).c_str());
-        }
-      }
-      TChainElement* chEl = (TChainElement*)ichain->GetListOfFiles()->First();
-      ifile = TFile::Open(chEl->GetTitle(),"READ");
-      if (file_count==0){ cout<<"No files found! Aborting."<<endl; return -3; }
-      if (output.empty()) {
-        output = chEl->GetTitle();
-        output = output.substr(output.rfind("/")+1,output.find(".root")-output.rfind("/")-1)+"_jec.root";
-      }
-    }
-  #else
-    cout << "Can't find the header file \"xrootd/XrdCl/XrdClFileSystem.hh\" and thus can't use xrootd." << endl;
-    return -4;
-  #endif
+
+  // #if(has_xrdcl)
+  //   else {
+  //     int file_count(0);
+  //     XrdCl::DirectoryList *response;
+  //     XrdCl::DirListFlags::Flags flags = XrdCl::DirListFlags::None;
+  //     XrdCl::URL url(url_string);
+  //     XrdCl::FileSystem fs(url);
+  //     fs.DirList(input,flags,response);
+  //     for(auto iresp=response->Begin(); iresp!=response->End(); iresp++) {
+  //       if((*iresp)->GetName().find(".root")!=std::string::npos) {
+  //          cout << "\tAdding " << url_string << input << (*iresp)->GetName() << endl;
+  //          file_count = ichain->Add((url_string+input+(*iresp)->GetName()).c_str());
+  //       }
+  //     }
+  //     TChainElement* chEl = (TChainElement*)ichain->GetListOfFiles()->First();
+  //     ifile = TFile::Open(chEl->GetTitle(),"READ");
+  //     if (file_count==0){ cout<<"No files found! Aborting."<<endl; return -3; }
+  //     if (output.empty()) {
+  //       output = chEl->GetTitle();
+  //       output = output.substr(output.rfind("/")+1,output.find(".root")-output.rfind("/")-1)+"_jec.root";
+  //     }
+  //   }
+  // #else
+  //   cout << "Can't find the header file \"xrootd/XrdCl/XrdClFileSystem.hh\" and thus can't use xrootd." << endl;
+  //   return -4;
+  // #endif
 
   TFile* ofile = TFile::Open(output.c_str(),"RECREATE");
   if (!ofile) { cout<<"Can't open file "<<output<<endl; return 0; }
@@ -153,7 +155,7 @@ int main(int argc,char**argv)
   for (unsigned int ialg=0;ialg<algs.size();++ialg) {
     string alg=algs[ialg];
     JetInfo jetInfo(algs[ialg]);
-    setChainElementNames(ichain,alg+"/t");
+    // setChainElementNames(ichain,alg+"/t");
     
     TDirectory* idir=(TDirectory*)ifile->Get(alg.c_str());
     if (0==idir) { cout<<"No dir "<<alg<<" found"<<endl; return 0; }
@@ -199,42 +201,59 @@ int main(int argc,char**argv)
       }
     if (debug) cout << "DONE" << endl;
     
-    //TTree*      itree=(TTree*)idir->Get("t");    
+    TTree*      itree=(TTree*)idir->Get("t");    
     TDirectory* odir;
     if(saveitree) {
       if (debug) cout << "Cloning and writing the input tree ... " << flush;
       odir =(TDirectory*)ofile->mkdir(idir->GetName()); odir->cd();
-      ichain->CloneTree()->Write();
+      itree->CloneTree()->Write();
       if (debug) cout << "DONE" << endl;
     }
     
     stringstream ssodirname; ssodirname<<jetInfo.abbreviation;
     for (unsigned int i=0;i<levels.size();i++) ssodirname<<"l"<<levels[i];
     odir=(TDirectory*)ofile->mkdir(ssodirname.str().c_str()); odir->cd();
-    ichain->SetBranchStatus("jtpt",0);
-    ichain->SetBranchStatus("jte", 0);
+    itree->SetBranchStatus("*", 1);
+    itree->SetBranchStatus("jtpt",0);
+    itree->SetBranchStatus("jte", 0);
     if (debug) cout << "Cloning the input tree to the output tree ... " << flush;
-    TTree*      otree = (debug) ? ichain->CloneTree(10000) : ichain->CloneTree(-1,"fast");
+    TTree*      otree = (debug) ? itree->CloneTree(10000) : itree->CloneTree(-1,"fast");
     if (debug) cout << "DONE" << endl;
-    ichain->SetBranchStatus("jtpt",1);
-    ichain->SetBranchStatus("jte", 1);
-    JRAEvent* JRAEvt = new JRAEvent(ichain,85);
-    TBranch* b_jtpt=otree->Branch("jtpt", "vector<Float_t>", &JRAEvt->jtpt);
-    TBranch* b_jte =otree->Branch("jte", "vector<Float_t>", &JRAEvt->jte);
+    itree->SetBranchStatus("jtpt",1);
+    itree->SetBranchStatus("jte", 1);
+    // JRAEvent* JRAEvt = new JRAEvent(itree,85);
+    vector<float> *jetpt=0, *jeteta=0, *jete=0, *jetarea=0;
+    float rho;
+    UChar_t nref;
+    // itree->SetMakeClass(1);
+    itree->SetBranchAddress("jtpt", &jetpt);
+    itree->SetBranchAddress("jteta", &jeteta);
+    itree->SetBranchAddress("jte", &jete);
+    itree->SetBranchAddress("jtarea", &jetarea);
+    itree->SetBranchAddress("rho", &rho);
+    // itree->SetBranchAddress("rho_hlt", &rho_hlt);
+    itree->SetBranchAddress("nref", &nref);
+    vector<float> *newpt = new vector<float>;
+    vector<float> *newe = new vector<float>;
+    TBranch* b_jtpt=otree->Branch("jtpt", newpt);
+    TBranch* b_jte =otree->Branch("jte", newe);
 
     if (debug) cout << "Starting event loop ... " << endl;
-    int nevt = (debug) ? 10000 : ichain->GetEntries();
+    int nevt = (debug) ? 10000 : itree->GetEntries();
     for (int ievt=0;ievt<nevt;ievt++) {
        if (ievt % 100000 == 0)
           cout<<ievt<<endl;
-       ichain->GetEntry(ievt);
-       for (unsigned int ijt=0;ijt<JRAEvt->nref;ijt++) {
-          corrector->setJetPt(JRAEvt->jtpt->at(ijt));
-          corrector->setJetE(JRAEvt->jte->at(ijt));
-          corrector->setJetEta(JRAEvt->jteta->at(ijt));
+       itree->GetEntry(ievt);
+       // otree->GetEntry(ievt);
+       newpt->clear();
+       newe->clear();
+       for (unsigned int ijt=0;ijt<nref;ijt++) {
+           corrector->setJetPt(jetpt->at(ijt));
+          corrector->setJetE(jete->at(ijt));
+          corrector->setJetEta(jeteta->at(ijt));
           if (TString(JetInfo::get_correction_levels(levels,L1FastJet)).Contains("L1FastJet")) {
-             if (JRAEvt->jtarea->at(ijt)!=0)
-                corrector->setJetA(JRAEvt->jtarea->at(ijt));
+             if (jetarea->at(ijt)!=0)
+                corrector->setJetA(jetarea->at(ijt));
              else if (jetInfo.coneSize>0)
                 corrector->setJetA(TMath::Pi()*TMath::Power(jetInfo.coneSize/10.0,2));
              else {
@@ -243,14 +262,17 @@ int main(int argc,char**argv)
              }
 
              if (jetInfo.isHLT())
-                corrector->setRho(JRAEvt->rho_hlt);
+                 // corrector->setRho(rho_hlt);
+                 corrector->setRho(rho);
              else
-                corrector->setRho(JRAEvt->rho);
+                 corrector->setRho(rho);
           }
-          if(!L1FastJet) corrector->setNPV(JRAEvt->npv);
+          // if(!L1FastJet) corrector->setNPV(JRAEvt->npv);
           float jec=corrector->getCorrection();
-          JRAEvt->jtpt->at(ijt)*=jec;
-          JRAEvt->jte->at(ijt) *=jec;
+          newpt->push_back(jetpt->at(ijt) * jec);
+          newe->push_back(jete->at(ijt) * jec);
+          // JRAEvt->jtpt->at(ijt)*=jec;
+          // JRAEvt->jte->at(ijt) *=jec;
        }
        b_jtpt->Fill();
        b_jte ->Fill();
@@ -258,10 +280,11 @@ int main(int argc,char**argv)
     otree->Write();
     //delete itree;
     delete otree;
+    delete itree;
+
   }
   
   //delete the input TChain
-  delete ichain;
   // close files
   ifile->Close();
   delete ifile;
